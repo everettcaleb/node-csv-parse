@@ -7,181 +7,184 @@
     // Library
     // ========================
 
-    // Generator function for strings that yields one character at a time
-    // str: String to iterate through
-    function *stringGen(str) {
-        yield* str;
-    }
-
-    // Yields one token at a time (value, '\n', or undefined)
-    // gen: Generator that returns one character at a time
-    // separator: The separator character, use ',' for CSV and '\t' for TAB
-    function *tokenize(gen, separator) {
-        var t = '',
-            n = null,
+    // Returns an array of tokens (each token is either a string value or newline character)
+    // str: The string to tokenize
+    // separator: The separator character, use ',' for CSV and '\t' for Tab-delimited
+    function tokenize(str, separator) {
+        var c = null,
+            i = 0,
+            sl = str.length,
+            t = '',
+            tokens = [],
             inQuotes = false;
 
         while(true) {
-            n = gen.next();
-            if(n.done) {
+            c = str[i];
+
+            // check if this is the last character
+            if(i + 1 === sl) {
+                // handle special quote logic
                 if(inQuotes) {
-                    switch(n.value) {
+                    switch(c) {
                         case '"':
                             inQuotes = false;
-                            return t;
+                            break;
                         default:
-                            t += n.value;
-                            return t;
+                            t += c;
                     }
+                    tokens.push(t);
                 }
                 else {
-                    switch(n.value) {
+                    switch(c) {
                         case separator:
                             if(t.length) {
-                                return t;
+                                tokens.push(t);
                             }
-                            return undefined;
+                            break;
                         case '"':
-                            return;
+                            break;
                         case '\n':
                             if(t.length) {
-                                yield t;
+                                tokens.push(t);
                             }
-                            return '\n';
+                            tokens.push('\n');
+                            break;
                         default:
-                            t += n.value;
-                            return t;
+                            t += c;
+                            tokens.push(t);
                     }
                 }
+                return tokens;
             }
-            else {
-                if(inQuotes) {
-                    switch(n.value) {
-                        case '"':
-                            inQuotes = false;
-                            yield t;
-                            t = '';
-                            break;
-                        default:
-                            t += n.value;
-                    }
+            // we've passed the last character already
+            else if(i >= sl) {
+                if(t.length) {
+                    tokens.push(t);
                 }
-                else {
-                    switch(n.value) {
-                        case separator:
-                            yield t;
-                            t = '';
-                            break;
+                return tokens;
+            }
+            // not the last character so business as usual
+            else {
+                // handle special quote logic
+                if(inQuotes) {
+                    switch(c) {
                         case '"':
-                            inQuotes = true;
-                            break;
-                        case '\n':
-                            if(t.length) {
-                                yield t;
+                            // handle escaped quotes
+                            if(str[i+1] === '"') {
+                                i++;
+                                t += '"';
+                            }
+                            else {
+                                inQuotes = false;
+                                tokens.push(t);
                                 t = '';
                             }
-                            yield '\n';
                             break;
                         default:
-                            t += n.value;
+                            t += c;
+                    }
+                }
+                else {
+                    switch(c) {
+                        case separator:
+                            if(t.length) {
+                                tokens.push(t);
+                                t = '';
+                            }
+                            break;
+                        case '"':
+                            // handle escaped quotes
+                            if(str[i+1] === '"') {
+                                i++;
+                                t += '"';
+                            }
+                            else {
+                                inQuotes = true;
+                            }
+                            break;
+                        case '\n':
+                            if(t.length) {
+                                tokens.push(t);
+                                t = '';
+                            }
+                            tokens.push('\n');
+                            break;
+                        default:
+                            t += c;
                     }
                 }
             }
+
+            i++;
         }
     }
 
-    // Yields one row (in array form) at a time
-    // gent: The token generator, should return a token for gent.next()
-    function *buildRow(gent) {
+    // Returns an array of rows (which are arrays of values)
+    // tokens: An array of tokens to parse
+    function buildRows(tokens) {
         var a = [],
-            n = null,
-            doneWithRow = false;
+            doneWithRow = false,
+            i = 0,
+            rows = [],
+            t = null,
+            tl = tokens.length;
 
-        while(true) {
-            n = gent.next();
+        for(; i < tl; i++) {
+            t = tokens[i];
 
-            switch(n.value) {
-                case undefined:
-                    break;
-                case '\n':
-                    doneWithRow = true;
-                    break;
-                default:
-                    a.push(n.value.trim());
+            if(t === '\n') {
+                doneWithRow = true;
+            }
+            else {
+                a.push(t.trim());
             }
 
-            if(n.done) {
-                return a;
-            }
-            else if(doneWithRow) {
-                yield a;
+            if(doneWithRow) {
+                rows.push(a);
                 a = [];
                 doneWithRow = false;
             }
         }
-    }
 
-    // Yields one row (in array form) at a time (including header row)
-    // str: The CSV/TAB string
-    // separator: The separator character, use ',' for CSV and '\t' for TAB
-    function *generateRows(str, separator) {
-        yield* buildRow(tokenize(stringGen(str), separator));
-    }
-
-    // Yields one row (in object form) at a time (excludes header row)
-    // str: The CSV/TAB string
-    // separator: The separator character, use ',' for CSV and '\t' for TAB
-    function *generateRowsAsObject(str, separator) {
-        var gen = buildRow(tokenize(stringGen(str), separator)),
-            n = gen.next(),
-            r = {},
-            header = n.value;
-
-        if(n.done) {
-            return {};
-        }
-
-        while(true) {
-            r = {};
-            n = gen.next();
-            n.value.forEach((c, i) => {
-                r[header[i]] = c;
-            });
-
-            if(n.done) {
-                return r;
-            }
-            else {
-                yield r;
-            }
-        }
-    }
-
-    // Parses a CSV/TAB file as an array of rows (where each row is an array of values)
-    // str: The CSV/TAB string
-    // separator: The separator character, use ',' for CSV and '\t' for TAB
-    function parseAsRows(str, separator) {
-        var rows = [];
-        for(let row of buildRow(tokenize(stringGen(str), separator))) {
-            rows.push(row);
+        if(a.length) {
+            rows.push(a);
         }
         return rows;
     }
 
-    // Parses a CSV/TAB file as an array of row objects (header row names the fields of the row objects)
+    // Returns an array of rows parsed from a CSV/TAB string
     // str: The CSV/TAB string
-    // separator: The separator character, use ',' for CSV and '\t' for TAB
-    function parseAsObjects(str, separator) {
-        var rows = parseAsRows(str, separator),
-            header = rows[0];
+    // separator: The separator character, use ',' for CSV and '\t' for Tab-delimited
+    function getRows(str, separator) {
+        return buildRows(tokenize(str, separator));
+    }
 
-        return rows.slice(1).map((row) => {
-            var r = {};
-            row.forEach((c, i) => {
+    // Returns an array of rows (in object form) exluding the header row
+    // str: The CSV/TAB string
+    // separator: The separator character, use ',' for CSV and '\t' for Tab-delimited
+    function getRowsAsObjects(str, separator) {
+        var i = 0,
+            rows = getRows(str, separator),
+            rl = rows.length,
+            r = {};
+
+        var header = rows[i++],
+            objs = [];
+
+        // there have to be at least 2 rows for this to do anything: header and data
+        if(rl < 2) {
+            return [];
+        }
+
+        for(; i < rl; i++) {
+            r = {};
+            rows[i].forEach((c, i) => {
                 r[header[i]] = c;
             });
-            return r;
-        });
+            objs.push(r);
+        }
+
+        return objs;
     }
 
     // ========================
@@ -199,13 +202,12 @@
     module.exports = function(str, separator) {
         separator = separator || ',';
         return {
-            asRows: parseAsRows.bind(null, str, separator),
-            asObjects: parseAsObjects.bind(null, str, separator)
+            asRows: getRows.bind(null, str, separator),
+            asObjects: getRowsAsObjects.bind(null, str, separator)
         };
     };
 
-    module.exports.parseAsRows = parseAsRows;
-    module.exports.parseAsObjects = parseAsObjects;
-    module.exports.generateRows = generateRows;
-    module.exports.generateRowsAsObject = generateRowsAsObject;
+    module.exports.parseAsRows = getRows;
+    module.exports.parseAsObjects = getRowsAsObjects;
+    // Note: generator functions removed unfortunately :/
 }();
