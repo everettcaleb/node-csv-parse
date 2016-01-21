@@ -74,7 +74,7 @@ describe('node-csv-parse', () => {
             assert.ok(parsed[0].id);                                     // test field
             assert.ok(parsed[0].description);                            // test trimming
             assert.ok(parsed[0].id == '1');                              // test line splitting
-            assert.ok(parsed[0].description == 'Hello\t World!');         // test quotes
+            assert.ok(parsed[0].description == 'Hello\t World!');        // test quotes
             assert.ok(parsed[1].description == 'split into 2\nlines');   // test line-break in quotes
             assert.ok(parsed[2].description == 'split into 2\r\nWindows-style lines'); // test Windows line-break in quotes
             assert.ok(!parsed[3]); // test ignore empty line
