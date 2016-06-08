@@ -2,7 +2,7 @@
 // Created by Caleb Everett <everettcaleb95@gmail.com>
 // Licensed under GPL-2.0
 "use strict";
-!(()=>{
+(()=>{
     // ========================
     // Library
     // ========================

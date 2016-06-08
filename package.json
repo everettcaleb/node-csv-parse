@@ -1,6 +1,6 @@
 {
   "name": "node-csv-parse",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "A simple JavaScript library that uses generators to parse CSV/tab-delimited files, no dependencies except mocha for testing",
   "main": "node-csv-parse.js",
   "scripts": {
